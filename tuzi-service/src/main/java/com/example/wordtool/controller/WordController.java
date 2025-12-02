@@ -1,6 +1,7 @@
 package com.example.wordtool.controller;
 
 import com.example.common.Result;
+import com.example.wordtool.util.WordCompressor;
 import com.example.wordtool.util.WordConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -55,16 +56,22 @@ public class WordController {
                 return Result.failure("文件大小不能超过 20MB");
             }
             // 2. 保存上传文件
+            String targetSuffix;
             String fileId = UUID.randomUUID().toString();
             File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
             file.transferTo(docxFile);
-            // 3. 创建输出 PDF 文件
-            File targetFile = uploadPath.resolve(fileId + "." + targetType).toFile();
+            // 3. 创建输出文件
+            if ("png".equalsIgnoreCase(targetType)) {
+                targetSuffix = "zip";
+            } else {
+                targetSuffix = targetType;
+            }
+            File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
             // 4. 执行转换
             WordConverter.convert(docxFile, targetFile, targetType);
             // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
-            String outputUrl = "/api/file/output/" + fileId + "." + targetType;
-            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetType;
+            String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
+            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
             long fileSize = targetFile.length();
 
             Map<String, Object> data = new HashMap<>();
@@ -72,6 +79,7 @@ public class WordController {
             data.put("url", outputUrl);
             data.put("fileName", outputName);
             data.put("fileId", fileId);
+            data.put("type", targetSuffix);
             return Result.success(data);
 
         } catch (Exception e) {
@@ -79,4 +87,51 @@ public class WordController {
             return Result.failure("转换失败：" + e.getMessage());
         }
     }
+
+    /**
+     * POST /api/word/compressor
+     * 压缩上传的 .docx 文件
+     */
+    @PostMapping(value = "/compressor", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Map<String, Object>> compressWord(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("fileName") String fileName,
+            @RequestParam("compressionLevel") int compressionLevel) throws Exception {
+        try {
+            // 1. 校验文件
+            if (file.isEmpty()) {
+                return Result.failure("文件为空");
+            }
+            if (fileName == null || !fileName.toLowerCase().endsWith(".docx")) {
+                return Result.failure("仅支持 .docx 格式");
+            }
+            if (file.getSize() > 20 * 1024 * 1024) { // 20MB
+                return Result.failure("文件大小不能超过 20MB");
+            }
+            // 2. 保存上传文件
+            String fileId = UUID.randomUUID().toString();
+            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
+            file.transferTo(docxFile);
+            // 3. 创建输出文件
+            File compressedFile = uploadPath.resolve(fileId + ".docx").toFile();
+            // 4. 执行压缩
+            WordCompressor.compressWord(docxFile.getPath(), compressedFile.getPath(), compressionLevel);
+            // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
+            String outputUrl = "/api/file/output/" + fileId + ".docx";
+            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".docx";
+            long fileSize = compressedFile.length();
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("size", fileSize);
+            data.put("url", outputUrl);
+            data.put("fileName", outputName);
+            data.put("fileId", fileId);
+            return Result.success(data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("压缩失败：" + e.getMessage());
+        }
+
+    }
+
 }
