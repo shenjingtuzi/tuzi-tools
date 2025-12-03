@@ -4,6 +4,7 @@ import com.aspose.words.Document;
 import com.aspose.words.ImageSaveOptions;
 import com.aspose.words.PageSet;
 import com.aspose.words.SaveFormat;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+@Log4j2
 public class WordConverter {
 
     /**
@@ -31,6 +33,8 @@ public class WordConverter {
         if (!docFile.exists()) {
             throw new FileNotFoundException("输入文件不存在: " + docFile.getPath());
         }
+        long l = System.currentTimeMillis();
+        log.info("开始转换文件: {} 到 {} 格式", docFile.getPath(), targetType);
         if ("png".equalsIgnoreCase(targetType)) {
             // 4. 生成 ZIP 压缩包（流式处理，无需临时文件）
             try (FileOutputStream fos = new FileOutputStream(targetFile);
@@ -90,6 +94,8 @@ public class WordConverter {
             }
         } catch (Exception e) {
             throw new IOException("转换失败: " + e.getMessage(), e);
+        } finally {
+            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", docFile.getPath(), targetType, System.currentTimeMillis() - l);
         }
     }
 

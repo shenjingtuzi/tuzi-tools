@@ -7,7 +7,6 @@ import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -29,8 +28,9 @@ public class ExcelConverter {
         if (!excelFile.exists()) {
             throw new FileNotFoundException("输入文件不存在: " + excelFile.getPath());
         }
+        long l = System.currentTimeMillis();
+        log.info("开始转换文件: {} 到 {} 格式", excelFile.getPath(), targetType);
         try {
-            FileOutputStream os = new FileOutputStream(targetFile);
             Workbook workbook = new Workbook(excelFile.getAbsolutePath());
             if ("pdf".equalsIgnoreCase(targetType)) {
                 workbook.save(targetFile.getAbsolutePath(), SaveFormat.PDF);
@@ -51,6 +51,8 @@ public class ExcelConverter {
             }
         } catch (Exception e) {
             throw new IOException("转换失败: " + e.getMessage(), e);
+        } finally {
+            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", excelFile.getPath(), targetType, System.currentTimeMillis() - l);
         }
     }
 
@@ -90,24 +92,24 @@ public class ExcelConverter {
 
 
 
-    public static void main(String[] args) throws FileNotFoundException {
-        InputStream is = ExcelConverter.class.getClassLoader().getResourceAsStream("license.xml");
-        License license = new License();
-        license.setLicense(is);
-        String sourceFile = "C:\\Users\\Wu\\Desktop\\工单统计1127.xlsx";//输入的文件
-        String targetFile = "C:\\Users\\Wu\\Desktop\\转换后.pdf";//输出的文件
-        try {
-            long old = System.currentTimeMillis();
-            FileOutputStream os = new FileOutputStream(targetFile);
-            Workbook excel = new Workbook(sourceFile);//加载源文件数据
-            excel.save(os, com.aspose.cells.SaveFormat.PDF);//设置转换文件类型并转换
-            os.close();
-            long now = System.currentTimeMillis();
-            System.out.println("共耗时：" + ((now - old) / 1000.0) + "秒");  //转化用时
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    public static void main(String[] args) throws FileNotFoundException {
+//        InputStream is = ExcelConverter.class.getClassLoader().getResourceAsStream("license.xml");
+//        License license = new License();
+//        license.setLicense(is);
+//        String sourceFile = "C:\\Users\\Wu\\Desktop\\工单统计1127.xlsx";//输入的文件
+//        String targetFile = "C:\\Users\\Wu\\Desktop\\转换后.pdf";//输出的文件
+//        try {
+//            long old = System.currentTimeMillis();
+//            FileOutputStream os = new FileOutputStream(targetFile);
+//            Workbook excel = new Workbook(sourceFile);//加载源文件数据
+//            excel.save(os, com.aspose.cells.SaveFormat.PDF);//设置转换文件类型并转换
+//            os.close();
+//            long now = System.currentTimeMillis();
+//            System.out.println("共耗时：" + ((now - old) / 1000.0) + "秒");  //转化用时
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
 }
 

@@ -1,8 +1,8 @@
 package com.example.exceltool.controller;
 
 import com.example.common.Result;
+import com.example.exceltool.util.ExcelCompressor;
 import com.example.exceltool.util.ExcelConverter;
-import com.example.wordtool.util.WordCompressor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -89,11 +89,11 @@ public class ExcelController {
     }
 
     /**
-     * POST /api/word/compressor
-     * 压缩上传的 .docx 文件
+     * POST /api/excel/compressor
+     * 压缩上传的 .xlsx 文件
      */
     @PostMapping(value = "/compressor", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<Map<String, Object>> compressWord(
+    public Result<Map<String, Object>> compressExcel(
             @RequestParam("file") MultipartFile file,
             @RequestParam("fileName") String fileName,
             @RequestParam("compressionLevel") int compressionLevel) throws Exception {
@@ -102,23 +102,23 @@ public class ExcelController {
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
-            if (fileName == null || !fileName.toLowerCase().endsWith(".docx")) {
-                return Result.failure("仅支持 .docx 格式");
+            if (fileName == null || (!fileName.toLowerCase().endsWith(".xlsx") && !fileName.toLowerCase().endsWith(".xls"))) {
+                return Result.failure("仅支持 .xlsx 和 .xls 格式");
             }
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
             }
             // 2. 保存上传文件
             String fileId = UUID.randomUUID().toString();
-            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
-            file.transferTo(docxFile);
+            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
+            file.transferTo(excelFile);
             // 3. 创建输出文件
-            File compressedFile = uploadPath.resolve(fileId + ".docx").toFile();
+            File compressedFile = uploadPath.resolve(fileId + ".xlsx").toFile();
             // 4. 执行压缩
-            WordCompressor.compressWord(docxFile.getPath(), compressedFile.getPath(), compressionLevel);
+            ExcelCompressor.compressExcel(excelFile.getPath(), compressedFile.getPath(), compressionLevel);
             // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
-            String outputUrl = "/api/file/output/" + fileId + ".docx";
-            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".docx";
+            String outputUrl = "/api/file/output/" + fileId + ".xlsx";
+            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".xlsx";
             long fileSize = compressedFile.length();
 
             Map<String, Object> data = new HashMap<>();

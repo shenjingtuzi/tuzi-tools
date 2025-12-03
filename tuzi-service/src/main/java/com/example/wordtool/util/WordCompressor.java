@@ -6,6 +6,7 @@ import com.aspose.words.NodeCollection;
 import com.aspose.words.NodeType;
 import com.aspose.words.OoxmlSaveOptions;
 import com.aspose.words.Shape;
+import lombok.extern.log4j.Log4j2;
 import net.coobird.thumbnailator.Thumbnails;
 
 import javax.imageio.ImageIO;
@@ -15,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 
 import static com.example.wordtool.util.WordConverter.registerWord2412;
 
+@Log4j2
 public class WordCompressor {
 
     /**
@@ -24,7 +26,8 @@ public class WordCompressor {
         registerWord2412();
         Document doc = new Document(inputPath);
         doc.cleanup();
-
+        long l = System.currentTimeMillis();
+        log.info("开始压缩文件: {} 到 {} 格式", inputPath, outputPath);
         NodeCollection nodes = doc.getChildNodes(NodeType.SHAPE, true);
         for (Shape shape : (Iterable<Shape>) nodes) {
             if (shape.isImage()) {
@@ -43,7 +46,7 @@ public class WordCompressor {
         saveOptions.setCompressionLevel(getCompressionLevel(level));
 
         doc.save(outputPath, saveOptions);
-
+        log.info("压缩文件: {} 到 {} 格式耗时: {} 毫秒", inputPath, outputPath, System.currentTimeMillis() - l);
     }
 
     private static byte[] compressPicture(BufferedImage image, int level) {
