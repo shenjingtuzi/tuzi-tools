@@ -1,8 +1,8 @@
-package com.example.wordtool.controller;
+package com.example.exceltool.controller;
 
 import com.example.common.Result;
+import com.example.exceltool.util.ExcelConverter;
 import com.example.wordtool.util.WordCompressor;
-import com.example.wordtool.util.WordConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -22,25 +22,25 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/word")
+@RequestMapping("/api/excel")
 @CrossOrigin // 小程序跨域支持
-public class WordController {
+public class ExcelController {
 
     @Value("${upload.path:${user.dir}/uploads}")
     private String uploadPathStr;
 
     private final Path uploadPath = Paths.get(System.getProperty("user.dir"), "uploads");
 
-    public WordController() throws IOException {
+    public ExcelController() throws IOException {
         Files.createDirectories(uploadPath);
     }
 
     /**
-     * POST /api/word/to-targetType
-     * 将上传的 .docx 转换为指定格式
+     * POST /api/excel/to-targetType
+     * 将上传的 .xlsx 转换为指定格式
      */
     @PostMapping(value = "/to-targetType", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<Map<String, Object>> convert(
+    public Result<Map<String, Object>> convertToPdf(
             @RequestParam("file") MultipartFile file,
             @RequestParam("fileName") String fileName,
             @RequestParam("targetType") String targetType) {
@@ -49,8 +49,8 @@ public class WordController {
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
-            if (fileName == null || !fileName.toLowerCase().endsWith(".docx")) {
-                return Result.failure("仅支持 .docx 格式");
+            if (fileName == null || (!fileName.toLowerCase().endsWith(".xlsx") && !fileName.toLowerCase().endsWith(".xls"))) {
+                return Result.failure("仅支持 .xlsx 和 .xls 格式");
             }
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
@@ -58,8 +58,8 @@ public class WordController {
             // 2. 保存上传文件
             String targetSuffix;
             String fileId = UUID.randomUUID().toString();
-            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
-            file.transferTo(docxFile);
+            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
+            file.transferTo(excelFile);
             // 3. 创建输出文件
             if ("png".equalsIgnoreCase(targetType)) {
                 targetSuffix = "zip";
@@ -68,7 +68,7 @@ public class WordController {
             }
             File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
             // 4. 执行转换
-            WordConverter.convert(docxFile, targetFile, targetType);
+            ExcelConverter.convert(excelFile, targetFile, targetType);
             // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
             String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
@@ -102,8 +102,8 @@ public class WordController {
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
-            if (fileName == null || (!fileName.toLowerCase().endsWith(".docx") && !fileName.toLowerCase().endsWith(".doc"))) {
-                return Result.failure("仅支持 .docx 和 .doc 格式");
+            if (fileName == null || !fileName.toLowerCase().endsWith(".docx")) {
+                return Result.failure("仅支持 .docx 格式");
             }
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
