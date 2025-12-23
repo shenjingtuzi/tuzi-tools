@@ -1,0 +1,210 @@
+package com.example.pdftool.controller;
+
+import com.alibaba.fastjson.JSON;
+import com.example.common.Result;
+import com.example.pdftool.entity.WatermarkInfo;
+import com.example.pdftool.entity.WatermarkParams;
+import com.example.pdftool.util.PDFEditor;
+import com.example.pdftool.util.PDFWatermarkAdder;
+import com.example.pdftool.util.PDFWatermarkRemover;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api/pdf")
+@CrossOrigin // 小程序跨域支持
+public class PDFController {
+
+    @Value("${upload.path:${user.dir}/uploads}")
+    private String uploadPathStr;
+
+    private final Path uploadPath = Paths.get(System.getProperty("user.dir"), "uploads");
+
+    @Resource
+    private PDFWatermarkAdder pdfWatermarkAdder;
+
+    @Resource
+    private PDFWatermarkRemover pdfWatermarkRemover;
+
+    @PostMapping("/addWatermark")
+    public Result<Map<String, String>> addWatermark(
+            @RequestParam("pdfFile") MultipartFile pdfFile,
+            @RequestParam("watermarkParams") String watermarkParamsStr) {
+        try {
+            // 1. 解析水印参数
+            WatermarkParams params = JSON.parseObject(watermarkParamsStr, WatermarkParams.class);
+            // 2. 保存原始PDF
+            String pdfFileName = UUID.randomUUID() + ".pdf";
+//            File originalPdfFile = uploadPath.resolve(pdfFileName).toFile();
+//            if (!originalPdfFile.getParentFile().exists()) {
+//                originalPdfFile.getParentFile().mkdirs();
+//            }
+//            pdfFile.transferTo(originalPdfFile);
+            // 3. 处理PDF水印
+            String processedPdfName = "watermark_" + pdfFileName;
+            File processedPdfFile = uploadPath.resolve(processedPdfName).toFile();
+
+            boolean success;
+            if ("image".equals(params.getType())) {
+                // 图片水印：直接使用上传的图片文件
+                success = pdfWatermarkAdder.addImageWatermark(pdfFile, processedPdfFile, params);
+            } else {
+                // 文字水印
+                success = pdfWatermarkAdder.addTextWatermark(pdfFile, processedPdfFile, params);
+            }
+
+            if (!success) {
+                return Result.failure("PDF加水印失败");
+            }
+            // 4. 返回处理后的PDF地址
+            String pdfUrl = "/api/file/output/" + processedPdfName;
+            Map<String, String> data = new HashMap<>();
+            data.put("size", String.valueOf(processedPdfFile.length()));
+            data.put("url", pdfUrl);
+            data.put("fileName", processedPdfName);
+            data.put("fileId", pdfFileName.replace(".pdf", ""));
+            data.put("type", "pdf");
+            return Result.success(data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("处理PDF失败：" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/getWaterMark")
+    public Result<List<WatermarkInfo>> getWaterMark(@RequestParam("pdfFile") MultipartFile file) {
+        try {
+            String pdfFileName = UUID.randomUUID() + ".pdf";
+            File originalPdfFile = uploadPath.resolve(pdfFileName).toFile();
+            if (!originalPdfFile.getParentFile().exists()) {
+                originalPdfFile.getParentFile().mkdirs();
+            }
+            file.transferTo(originalPdfFile);
+            List<WatermarkInfo> watermarkInfos = pdfWatermarkRemover.getWatermark(originalPdfFile.getAbsolutePath());
+            return Result.success(watermarkInfos);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("获取PDF水印失败：" + e.getMessage());
+        }
+
+    }
+
+
+    @PostMapping("/removeWaterMark")
+    public Result<Map<String, String>> removeWaterMark(@RequestParam("pdfFile") MultipartFile file,
+                                                       @RequestParam(name = "watermarkIds", required = false) String watermarkIds,
+                                                       @RequestParam(name = "type", defaultValue = "all") String type,
+                                                       @RequestParam(name = "targetPages", required = false) List<Integer> pages) {
+        try {
+            String pdfFileName = UUID.randomUUID() + ".pdf";
+//            File originalPdfFile = uploadPath.resolve(pdfFileName).toFile();
+//            if (!originalPdfFile.getParentFile().exists()) {
+//                originalPdfFile.getParentFile().mkdirs();
+//            }
+//            file.transferTo(originalPdfFile);
+            String processedPdfName = "removewatermark_" + pdfFileName;
+            File processedPdfFile = uploadPath.resolve(processedPdfName).toFile();
+
+            boolean success = pdfWatermarkRemover.removeAllWatermarks(file, processedPdfFile.getAbsolutePath(), type, watermarkIds, pages);
+
+            if (!success) {
+                return Result.failure("PDF加水印失败");
+            }
+            // 4. 返回处理后的PDF地址
+            String pdfUrl = "/api/file/output/" + processedPdfName;
+            Map<String, String> data = new HashMap<>();
+            data.put("size", String.valueOf(processedPdfFile.length()));
+            data.put("url", pdfUrl);
+            data.put("fileName", processedPdfName);
+            data.put("fileId", pdfFileName.replace(".pdf", ""));
+            data.put("type", "pdf");
+            return Result.success(data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("处理PDF失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /api/pdf/to-targetType
+     * 将上传的 .xlsx 转换为指定格式
+     */
+    @PostMapping(value = "/to-targetType", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Map<String, Object>> convert(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("fileName") String fileName,
+            @RequestParam("targetType") String targetType) {
+        try {
+            if (file.isEmpty()) {
+                return Result.failure("文件为空");
+            }
+            if (fileName == null || (!fileName.toLowerCase().endsWith(".pdf"))) {
+                return Result.failure("仅支持 .pdf 格式");
+            }
+            if (file.getSize() > 20 * 1024 * 1024) { // 20MB
+                return Result.failure("文件大小不能超过 20MB");
+            }
+            String targetSuffix;
+            String fileId = UUID.randomUUID().toString();
+//            File pdfFile = uploadPath.resolve(fileId + ".pdf").toFile();
+//            file.transferTo(pdfFile);
+            if ("png".equalsIgnoreCase(targetType)) {
+                targetSuffix = "zip";
+            } else {
+                targetSuffix = targetType;
+            }
+            File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
+            pdfWatermarkRemover.convert(file, targetFile, targetType);
+            String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
+            String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
+            long fileSize = targetFile.length();
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("size", fileSize);
+            data.put("url", outputUrl);
+            data.put("fileName", outputName);
+            data.put("fileId", fileId);
+            data.put("type", targetSuffix);
+            return Result.success(data);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("转换失败：" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/thumbnails")
+    public Result<List<String>> getPdfThumbnails(@RequestParam("pdfFile") MultipartFile pdfFile) {
+        try {
+            // 生成小程序适配的缩略图字节数组列表
+            List<byte[]> thumbnailBytesList = PDFEditor.generateAllPageThumbnailsForMiniProgram(pdfFile);
+
+            // 转为Base64字符串列表（前端可直接渲染）
+            List<String> base64ThumbnailList = thumbnailBytesList.stream()
+                    .map(bytes -> Base64.getEncoder().encodeToString(bytes))
+                    .collect(Collectors.toList());
+
+            return Result.success(base64ThumbnailList);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.failure("生成PDF缩略图失败：" + e.getMessage());
+        }
+    }
+}

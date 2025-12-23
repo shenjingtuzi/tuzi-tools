@@ -5,11 +5,11 @@ import com.aspose.words.ImageSaveOptions;
 import com.aspose.words.PageSet;
 import com.aspose.words.SaveFormat;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -23,23 +23,20 @@ public class WordConverter {
 
     /**
      * 将 Word 文档转换为 PDF 文档
-     * @param docFile 输入的 Word 文件路径 (.doc 或 .docx)
+     * @param file 输入的 Word 文件路径 (.doc 或 .docx)
      * @param targetFile 输出的目标文件路径
      * @param targetType 目标文件类型
      * @throws IOException 当文件读取或写入失败时抛出
      */
-    public static void convert(File docFile, File targetFile, String targetType) throws Exception {
+    public static void convert(MultipartFile file, File targetFile, String targetType) throws Exception {
         registerWord2412();
-        if (!docFile.exists()) {
-            throw new FileNotFoundException("输入文件不存在: " + docFile.getPath());
-        }
+        Document doc = new Document(file.getInputStream());
         long l = System.currentTimeMillis();
-        log.info("开始转换文件: {} 到 {} 格式", docFile.getPath(), targetType);
+        log.info("开始转换文件: {} 到 {} 格式", file.getOriginalFilename(), targetType);
         if ("png".equalsIgnoreCase(targetType)) {
             // 4. 生成 ZIP 压缩包（流式处理，无需临时文件）
             try (FileOutputStream fos = new FileOutputStream(targetFile);
                  ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(fos))) {
-                Document doc = new Document(docFile.getAbsolutePath());
                 // 3. 配置 PNG 输出选项
                 ImageSaveOptions imageOptions = new ImageSaveOptions(SaveFormat.PNG);
                 imageOptions.setUseAntiAliasing(true); // 启用抗锯齿（让文字/线条更平滑）
@@ -74,7 +71,6 @@ public class WordConverter {
 
         try {
             // 加载Word文档
-            Document doc = new Document(docFile.getAbsolutePath());
             if ("pdf".equalsIgnoreCase(targetType)) {
                 doc.save(targetFile.getAbsolutePath(), SaveFormat.PDF);
             } else if ("png".equalsIgnoreCase(targetType)) {
@@ -95,7 +91,7 @@ public class WordConverter {
         } catch (Exception e) {
             throw new IOException("转换失败: " + e.getMessage(), e);
         } finally {
-            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", docFile.getPath(), targetType, System.currentTimeMillis() - l);
+            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", file.getOriginalFilename(), targetType, System.currentTimeMillis() - l);
         }
     }
 

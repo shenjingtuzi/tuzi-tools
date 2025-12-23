@@ -4,9 +4,9 @@ import com.aspose.cells.License;
 import com.aspose.cells.SaveFormat;
 import com.aspose.cells.Workbook;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -19,19 +19,17 @@ public class ExcelConverter {
 
     /**
      * 将 Excel 文档转换为 目标格式文档
-     * @param excelFile 输入的 Word 文件路径 (.doc 或 .docx)
+     * @param file 输入的 Word 文件路径 (.doc 或 .docx)
      * @param targetFile 输出的目标文件路径
      * @param targetType 目标文件类型
      * @throws IOException 当文件读取或写入失败时抛出
      */
-    public static void convert(File excelFile, File targetFile, String targetType) throws IOException {
-        if (!excelFile.exists()) {
-            throw new FileNotFoundException("输入文件不存在: " + excelFile.getPath());
-        }
+    public static void convert(MultipartFile file, File targetFile, String targetType) throws IOException {
+
         long l = System.currentTimeMillis();
-        log.info("开始转换文件: {} 到 {} 格式", excelFile.getPath(), targetType);
+        log.info("开始转换文件: {} 到 {} 格式", file.getOriginalFilename(), targetType);
         try {
-            Workbook workbook = new Workbook(excelFile.getAbsolutePath());
+            Workbook workbook = new Workbook(file.getInputStream());
             if ("pdf".equalsIgnoreCase(targetType)) {
                 workbook.save(targetFile.getAbsolutePath(), SaveFormat.PDF);
             } else if ("png".equalsIgnoreCase(targetType)) {
@@ -52,7 +50,7 @@ public class ExcelConverter {
         } catch (Exception e) {
             throw new IOException("转换失败: " + e.getMessage(), e);
         } finally {
-            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", excelFile.getPath(), targetType, System.currentTimeMillis() - l);
+            log.info("转换文件: {} 到 {} 格式耗时: {} 毫秒", file.getOriginalFilename(), targetType, System.currentTimeMillis() - l);
         }
     }
 

@@ -45,7 +45,7 @@ public class WordController {
             @RequestParam("fileName") String fileName,
             @RequestParam("targetType") String targetType) {
         try {
-            // 1. 校验文件
+            // 校验文件
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
@@ -55,21 +55,20 @@ public class WordController {
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
             }
-            // 2. 保存上传文件
             String targetSuffix;
             String fileId = UUID.randomUUID().toString();
-            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
-            file.transferTo(docxFile);
-            // 3. 创建输出文件
+            // 保存上传文件
+//            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
+//            file.transferTo(docxFile);
             if ("png".equalsIgnoreCase(targetType)) {
                 targetSuffix = "zip";
             } else {
                 targetSuffix = targetType;
             }
             File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
-            // 4. 执行转换
-            WordConverter.convert(docxFile, targetFile, targetType);
-            // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
+            // 执行转换
+            WordConverter.convert(file, targetFile, targetType);
+
             String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
             long fileSize = targetFile.length();
@@ -115,7 +114,7 @@ public class WordController {
             // 3. 创建输出文件
             File compressedFile = uploadPath.resolve(fileId + ".docx").toFile();
             // 4. 执行压缩
-            WordCompressor.compressWord(docxFile.getPath(), compressedFile.getPath(), compressionLevel);
+            WordCompressor.compressWord(file, compressedFile.getPath(), compressionLevel);
             // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
             String outputUrl = "/api/file/output/" + fileId + ".docx";
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".docx";

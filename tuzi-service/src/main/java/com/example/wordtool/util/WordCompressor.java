@@ -8,6 +8,7 @@ import com.aspose.words.OoxmlSaveOptions;
 import com.aspose.words.Shape;
 import lombok.extern.log4j.Log4j2;
 import net.coobird.thumbnailator.Thumbnails;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -22,18 +23,17 @@ public class WordCompressor {
     /**
      * 压缩 Word 文档（支持 24.12）
      */
-    public static void compressWord(String inputPath, String outputPath, int level) throws Exception {
+    public static void compressWord(MultipartFile file, String outputPath, int level) throws Exception {
         registerWord2412();
-        Document doc = new Document(inputPath);
+        Document doc = new Document(file.getInputStream());
         doc.cleanup();
         long l = System.currentTimeMillis();
-        log.info("开始压缩文件: {} 到 {} 格式", inputPath, outputPath);
+        log.info("开始压缩文件: {} 到 {} 格式", file.getOriginalFilename(), outputPath);
         NodeCollection nodes = doc.getChildNodes(NodeType.SHAPE, true);
         for (Shape shape : (Iterable<Shape>) nodes) {
             if (shape.isImage()) {
                 // 由开发人员选择用于图像压缩的库。
                 BufferedImage image = ImageIO.read(shape.getImageData().toStream());
-                int imageType = shape.getImageData().getImageType();
                 byte[] compressedImage = compressPicture(image, level);
                 // 压缩图像并将其设置回形状。
                 shape.getImageData().setImage(new ByteArrayInputStream(compressedImage));
@@ -46,7 +46,7 @@ public class WordCompressor {
         saveOptions.setCompressionLevel(getCompressionLevel(level));
 
         doc.save(outputPath, saveOptions);
-        log.info("压缩文件: {} 到 {} 格式耗时: {} 毫秒", inputPath, outputPath, System.currentTimeMillis() - l);
+        log.info("压缩文件: {} 到 {} 格式耗时: {} 毫秒", file.getOriginalFilename(), outputPath, System.currentTimeMillis() - l);
     }
 
     private static byte[] compressPicture(BufferedImage image, int level) {

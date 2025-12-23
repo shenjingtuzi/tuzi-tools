@@ -36,7 +36,8 @@ public class FileController {
         }
 
         Resource resource = new FileSystemResource(file);
-        String contentType = "application/pdf";
+        String type = fileId.substring(fileId.indexOf(".") + 1, fileId.length());
+        String contentType = "application/" + type;
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))

@@ -40,12 +40,11 @@ public class ExcelController {
      * 将上传的 .xlsx 转换为指定格式
      */
     @PostMapping(value = "/to-targetType", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<Map<String, Object>> convertToPdf(
+    public Result<Map<String, Object>> convert(
             @RequestParam("file") MultipartFile file,
             @RequestParam("fileName") String fileName,
             @RequestParam("targetType") String targetType) {
         try {
-            // 1. 校验文件
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
@@ -55,21 +54,17 @@ public class ExcelController {
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
             }
-            // 2. 保存上传文件
             String targetSuffix;
             String fileId = UUID.randomUUID().toString();
-            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
-            file.transferTo(excelFile);
-            // 3. 创建输出文件
+//            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
+//            file.transferTo(excelFile);
             if ("png".equalsIgnoreCase(targetType)) {
                 targetSuffix = "zip";
             } else {
                 targetSuffix = targetType;
             }
             File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
-            // 4. 执行转换
-            ExcelConverter.convert(excelFile, targetFile, targetType);
-            // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
+            ExcelConverter.convert(file, targetFile, targetType);
             String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
             long fileSize = targetFile.length();
@@ -98,7 +93,6 @@ public class ExcelController {
             @RequestParam("fileName") String fileName,
             @RequestParam("compressionLevel") int compressionLevel) throws Exception {
         try {
-            // 1. 校验文件
             if (file.isEmpty()) {
                 return Result.failure("文件为空");
             }
@@ -108,15 +102,11 @@ public class ExcelController {
             if (file.getSize() > 20 * 1024 * 1024) { // 20MB
                 return Result.failure("文件大小不能超过 20MB");
             }
-            // 2. 保存上传文件
             String fileId = UUID.randomUUID().toString();
-            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
-            file.transferTo(excelFile);
-            // 3. 创建输出文件
+//            File excelFile = uploadPath.resolve(fileId + ".xlsx").toFile();
+//            file.transferTo(excelFile);
             File compressedFile = uploadPath.resolve(fileId + ".xlsx").toFile();
-            // 4. 执行压缩
-            ExcelCompressor.compressExcel(excelFile.getPath(), compressedFile.getPath(), compressionLevel);
-            // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
+            ExcelCompressor.compressExcel(file, compressedFile.getPath(), compressionLevel);
             String outputUrl = "/api/file/output/" + fileId + ".xlsx";
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".xlsx";
             long fileSize = compressedFile.length();

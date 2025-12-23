@@ -6,6 +6,7 @@ import com.aspose.cells.OoxmlCompressionType;
 import com.aspose.cells.Workbook;
 import com.aspose.cells.XlsbSaveOptions;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
@@ -21,15 +22,15 @@ public class ExcelCompressor {
     /**
      * 压缩 Word 文档（支持 24.12）
      */
-    public static void compressExcel(String inputPath, String outputPath, int level) throws Exception {
-        Workbook workbook = new Workbook(inputPath);
+    public static void compressExcel(MultipartFile file, String outputPath, int level) throws Exception {
+        Workbook workbook = new Workbook(file.getInputStream());
         XlsbSaveOptions options = new XlsbSaveOptions();
         long l = System.currentTimeMillis();
-        log.info("开始压缩文件: {} 到 {} 格式", inputPath, outputPath);
+        log.info("开始压缩文件: {} 到 {} 格式", file.getOriginalFilename(), outputPath);
         int compressionLevel = getCompressionLevel(level);
         options.setCompressionType(compressionLevel);
         workbook.save(outputPath, options);
-        log.info("压缩文件: {} 到 {} 格式耗时: {} 毫秒", inputPath, outputPath, System.currentTimeMillis() - l);
+        log.info("压缩文件: {} 到 {} 格式耗时: {} 毫秒", file.getOriginalFilename(), outputPath, System.currentTimeMillis() - l);
     }
 
     private static int getCompressionLevel(int level) {
