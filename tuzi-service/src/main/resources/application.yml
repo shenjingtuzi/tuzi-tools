@@ -1,0 +1,63 @@
+# 服务器端口
+server:
+  port: 8080
+  servlet:
+    context-path: /tuzi-service
+# 文件上传大小限制
+spring:
+  application:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  datasource:
+    url: jdbc:mysql://mysql:3306/mini_program?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  # 微信小程序配置（替换为你的实际参数）
+  wechat:
+    app-id: appid  # 小程序AppID
+    app-secret: appsecret  # 小程序AppSecret
+
+# JWT 配置
+jwt:
+  secret: your-secret-key-32bytes-long-12345678  # 密钥（建议32位以上）
+  expire: 86400000  # token有效期（毫秒），这里是1天
+# 日志配置
+logging:
+  level:
+    com.example: debug
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  # Mapper.xml 文件路径（若有）
+#  mapper-locations: classpath:mapper/**/*.xml
+  # 实体类别名包
+  type-aliases-package: com.example.entity
+  # 全局配置
+  global-config:
+    db-config:
+      # 主键类型：AUTO=自增
+      id-type: AUTO
+      # 逻辑删除字段（本项目暂未使用）
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  # 配置分页插件（可选，后续查询接口会用到）
+  configuration:
+    # 开启驼峰命名转换
+    map-underscore-to-camel-case: true
+    # 显示SQL日志（开发环境开启，生产环境关闭）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 文件存储路径 (确保该目录存在并有写入权限)
+#app.upload.base-path=./uploads/
+app.upload.base-path: C:/Users/Wu/Desktop/demo/
+app.temp-path: ${app.upload.base-path}temp/
+app.output-path: ${app.upload.base-path}output/
+
+
+ffmpeg.path: ffmpeg
+heif-enc.path: heif-enc
+exiftool.path: exiftool
+user.dir: ${app.upload.base-path}
