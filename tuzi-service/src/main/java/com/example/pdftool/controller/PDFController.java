@@ -2,6 +2,7 @@ package com.example.pdftool.controller;
 
 import com.alibaba.fastjson.JSON;
 import com.example.common.Result;
+import com.example.pdftool.entity.PageGenerateVo;
 import com.example.pdftool.entity.WatermarkInfo;
 import com.example.pdftool.entity.WatermarkParams;
 import com.example.pdftool.util.PDFEditor;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -191,20 +193,57 @@ public class PDFController {
     }
 
     @PostMapping("/thumbnails")
-    public Result<List<String>> getPdfThumbnails(@RequestParam("pdfFile") MultipartFile pdfFile) {
+    public Result<Map<String, Object>> getPdfThumbnails(@RequestParam("pdfFile") MultipartFile pdfFile) {
+        if (pdfFile == null || pdfFile.isEmpty()) {
+            throw new IllegalArgumentException("传入的PDF文件不能为空");
+        }
+        String originalFileName = pdfFile.getOriginalFilename();
+        if (originalFileName == null || !originalFileName.toLowerCase().endsWith(".pdf")) {
+            throw new IllegalArgumentException("传入的文件不是PDF格式");
+        }
         try {
+            String fileName = UUID.randomUUID() + ".pdf";
+            File saveFile = uploadPath.resolve(fileName).toFile();
+            pdfFile.transferTo(saveFile);
             // 生成小程序适配的缩略图字节数组列表
-            List<byte[]> thumbnailBytesList = PDFEditor.generateAllPageThumbnailsForMiniProgram(pdfFile);
+            List<byte[]> thumbnailBytesList = PDFEditor.generateAllPageThumbnailsForMiniProgram(saveFile);
 
             // 转为Base64字符串列表（前端可直接渲染）
             List<String> base64ThumbnailList = thumbnailBytesList.stream()
                     .map(bytes -> Base64.getEncoder().encodeToString(bytes))
                     .collect(Collectors.toList());
-
-            return Result.success(base64ThumbnailList);
+            Map<String, Object> data = new HashMap<>();
+            data.put("fileName", fileName);
+            data.put("thumbnails", base64ThumbnailList);
+            return Result.success(data);
         } catch (Exception e) {
             e.printStackTrace();
             return Result.failure("生成PDF缩略图失败：" + e.getMessage());
         }
     }
+
+    @PostMapping("/generate-pdf")
+    public Result<Map<String, String>> generatePdf(@RequestBody PageGenerateVo vo) {
+        List<String> pageOrder = vo.getOrder();
+        Map<String, Integer> rotateMap = vo.getRotateMap();
+        List<Map<String, Object>> addedPages = vo.getAddedPages();
+        Map<String, Object> originalPdf = vo.getOriginalPdf();
+        String originalFileName = (String) originalPdf.get("name");
+        File originalPdfFile = uploadPath.resolve(originalFileName).toFile();
+        String pdfFileName = UUID.randomUUID() + ".pdf";
+        File pdfFile = uploadPath.resolve(pdfFileName).toFile();
+        boolean success = PDFEditor.generate(originalPdfFile, pdfFile, pageOrder, rotateMap, addedPages);
+        if (!success) {
+            return Result.failure("PDF生成失败");
+        }
+        String pdfUrl = "/api/file/output/" + pdfFileName;
+        Map<String, String> data = new HashMap<>();
+        data.put("size", String.valueOf(pdfFile.length()));
+        data.put("url", pdfUrl);
+        data.put("fileName", pdfFileName);
+        data.put("fileId", pdfFileName.replace(".pdf", ""));
+        data.put("type", "pdf");
+        return Result.success(data);
+    }
+
 }
