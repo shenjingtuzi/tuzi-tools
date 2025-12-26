@@ -1,12 +1,12 @@
 package com.example.wordtool.controller;
 
 import com.example.common.Result;
-import com.example.wordtool.util.WordCompressor;
-import com.example.wordtool.util.WordConverter;
+import com.example.wordtool.util.WordUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,7 +67,7 @@ public class WordController {
             }
             File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
             // 执行转换
-            WordConverter.convert(file, targetFile, targetType);
+            WordUtils.convert(file, targetFile, targetType);
 
             String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
@@ -95,7 +95,7 @@ public class WordController {
     public Result<Map<String, Object>> compressWord(
             @RequestParam("file") MultipartFile file,
             @RequestParam("fileName") String fileName,
-            @RequestParam("compressionLevel") int compressionLevel) throws Exception {
+            @RequestParam("compressionLevel") int compressionLevel) {
         try {
             // 1. 校验文件
             if (file.isEmpty()) {
@@ -109,12 +109,12 @@ public class WordController {
             }
             // 2. 保存上传文件
             String fileId = UUID.randomUUID().toString();
-            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
-            file.transferTo(docxFile);
+//            File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
+//            file.transferTo(docxFile);
             // 3. 创建输出文件
             File compressedFile = uploadPath.resolve(fileId + ".docx").toFile();
             // 4. 执行压缩
-            WordCompressor.compressWord(file, compressedFile.getPath(), compressionLevel);
+            WordUtils.compressWord(file, compressedFile.getPath(), compressionLevel);
             // 5. 返回结果（前端可通过 /api/file/output/{id} 下载）
             String outputUrl = "/api/file/output/" + fileId + ".docx";
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + ".docx";
@@ -131,6 +131,71 @@ public class WordController {
             return Result.failure("压缩失败：" + e.getMessage());
         }
 
+    }
+
+    @PostMapping(value = "/check-encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Map<String, Object>> checkEncryptWord(
+            @RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return Result.failure("文件为空");
+        }
+        if (file.getSize() > 20 * 1024 * 1024) { // 20MB
+            return Result.failure("文件大小不能超过 20MB");
+        }
+        String fileId = UUID.randomUUID().toString();
+        File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
+        try {
+            file.transferTo(docxFile);
+        } catch (IOException e) {
+            return Result.failure("文件上传失败：" + e.getMessage());
+        }
+        boolean isEncrypted = WordUtils.isEncrypted(docxFile);
+        Map<String, Object> data = new HashMap<>();
+        data.put("isEncrypted", isEncrypted);
+        data.put("fileId", fileId);
+        return Result.success(data);
+    }
+
+    @PostMapping(value = "/encrypt")
+    public Result<Map<String, Object>> encryptWord(@RequestBody Map<String, Object> encryptParams) {
+        String ownerPassword = encryptParams.get("password").toString();
+        String fileId = encryptParams.get("fileId").toString();
+
+        File docxFile = uploadPath.resolve(fileId + ".docx").toFile();
+
+        WordUtils.encryptWord(docxFile, docxFile.getPath(), ownerPassword);
+        String outputUrl = "/api/file/output/" + fileId + ".docx";
+        String outputName = docxFile.getName();
+        long fileSize = docxFile.length();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("size", fileSize);
+        data.put("url", outputUrl);
+        data.put("fileName", outputName);
+        data.put("type", "docx");
+        data.put("fileId", fileId);
+        return Result.success(data);
+    }
+
+    @PostMapping(value = "/decrypt")
+    public Result<Map<String, Object>> decryptWord(@RequestBody Map<String, Object> encryptParams) {
+        String ownerPassword = encryptParams.get("password").toString();
+        String fileId = encryptParams.get("fileId").toString();
+
+        File encryptDoc = uploadPath.resolve(fileId + ".docx").toFile();
+
+        WordUtils.decryptWord(encryptDoc, encryptDoc.getPath(), ownerPassword);
+        String outputUrl = "/api/file/output/" + fileId + ".docx";
+        String outputName = encryptDoc.getName();
+        long fileSize = encryptDoc.length();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("size", fileSize);
+        data.put("url", outputUrl);
+        data.put("fileName", outputName);
+        data.put("type", "docx");
+        data.put("fileId", fileId);
+        return Result.success(data);
     }
 
 }

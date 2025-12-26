@@ -5,9 +5,8 @@ import com.example.common.Result;
 import com.example.pdftool.entity.PageGenerateVo;
 import com.example.pdftool.entity.WatermarkInfo;
 import com.example.pdftool.entity.WatermarkParams;
-import com.example.pdftool.util.PDFEditor;
-import com.example.pdftool.util.PDFWatermarkAdder;
-import com.example.pdftool.util.PDFWatermarkRemover;
+import com.example.pdftool.util.PDFUtils;
+import com.example.pdftool.util.PDFWatermarkUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -18,8 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
@@ -38,12 +37,6 @@ public class PDFController {
     private String uploadPathStr;
 
     private final Path uploadPath = Paths.get(System.getProperty("user.dir"), "uploads");
-
-    @Resource
-    private PDFWatermarkAdder pdfWatermarkAdder;
-
-    @Resource
-    private PDFWatermarkRemover pdfWatermarkRemover;
 
     @PostMapping("/addWatermark")
     public Result<Map<String, String>> addWatermark(
@@ -66,10 +59,10 @@ public class PDFController {
             boolean success;
             if ("image".equals(params.getType())) {
                 // 图片水印：直接使用上传的图片文件
-                success = pdfWatermarkAdder.addImageWatermark(pdfFile, processedPdfFile, params);
+                success = PDFWatermarkUtils.addImageWatermark(pdfFile, processedPdfFile, params);
             } else {
                 // 文字水印
-                success = pdfWatermarkAdder.addTextWatermark(pdfFile, processedPdfFile, params);
+                success = PDFWatermarkUtils.addTextWatermark(pdfFile, processedPdfFile, params);
             }
 
             if (!success) {
@@ -99,7 +92,7 @@ public class PDFController {
                 originalPdfFile.getParentFile().mkdirs();
             }
             file.transferTo(originalPdfFile);
-            List<WatermarkInfo> watermarkInfos = pdfWatermarkRemover.getWatermark(originalPdfFile.getAbsolutePath());
+            List<WatermarkInfo> watermarkInfos = PDFWatermarkUtils.getWatermark(originalPdfFile.getAbsolutePath());
             return Result.success(watermarkInfos);
         } catch (Exception e) {
             e.printStackTrace();
@@ -124,7 +117,7 @@ public class PDFController {
             String processedPdfName = "removewatermark_" + pdfFileName;
             File processedPdfFile = uploadPath.resolve(processedPdfName).toFile();
 
-            boolean success = pdfWatermarkRemover.removeAllWatermarks(file, processedPdfFile.getAbsolutePath(), type, watermarkIds, pages);
+            boolean success = PDFWatermarkUtils.removeAllWatermarks(file, processedPdfFile.getAbsolutePath(), type, watermarkIds, pages);
 
             if (!success) {
                 return Result.failure("PDF加水印失败");
@@ -173,7 +166,7 @@ public class PDFController {
                 targetSuffix = targetType;
             }
             File targetFile = uploadPath.resolve(fileId + "." + targetSuffix).toFile();
-            pdfWatermarkRemover.convert(file, targetFile, targetType);
+            PDFUtils.convert(file, targetFile, targetType);
             String outputUrl = "/api/file/output/" + fileId + "." + targetSuffix;
             String outputName = fileName.substring(0, fileName.lastIndexOf('.')) + "." + targetSuffix;
             long fileSize = targetFile.length();
@@ -206,7 +199,7 @@ public class PDFController {
             File saveFile = uploadPath.resolve(fileName).toFile();
             pdfFile.transferTo(saveFile);
             // 生成小程序适配的缩略图字节数组列表
-            List<byte[]> thumbnailBytesList = PDFEditor.generateAllPageThumbnailsForMiniProgram(saveFile);
+            List<byte[]> thumbnailBytesList = PDFUtils.generateThumbnails(saveFile);
 
             // 转为Base64字符串列表（前端可直接渲染）
             List<String> base64ThumbnailList = thumbnailBytesList.stream()
@@ -232,7 +225,7 @@ public class PDFController {
         File originalPdfFile = uploadPath.resolve(originalFileName).toFile();
         String pdfFileName = UUID.randomUUID() + ".pdf";
         File pdfFile = uploadPath.resolve(pdfFileName).toFile();
-        boolean success = PDFEditor.generate(originalPdfFile, pdfFile, pageOrder, rotateMap, addedPages);
+        boolean success = PDFUtils.generate(originalPdfFile, pdfFile, pageOrder, rotateMap, addedPages);
         if (!success) {
             return Result.failure("PDF生成失败");
         }
@@ -246,4 +239,69 @@ public class PDFController {
         return Result.success(data);
     }
 
+    @PostMapping(value = "/check-encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Map<String, Object>> checkEncryptPdf(
+            @RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return Result.failure("文件为空");
+        }
+        if (file.getSize() > 20 * 1024 * 1024) { // 20MB
+            return Result.failure("文件大小不能超过 20MB");
+        }
+        String fileId = UUID.randomUUID().toString();
+        File pdfFile = uploadPath.resolve(fileId + ".pdf").toFile();
+        try {
+            file.transferTo(pdfFile);
+        } catch (IOException e) {
+            return Result.failure("文件上传失败：" + e.getMessage());
+        }
+        boolean isEncrypted = PDFUtils.isEncrypted(pdfFile);
+        Map<String, Object> data = new HashMap<>();
+        data.put("isEncrypted", isEncrypted);
+        data.put("fileId", fileId);
+        return Result.success(data);
+    }
+
+    @PostMapping(value = "/encrypt")
+    public Result<Map<String, Object>> encryptPdf(@RequestBody Map<String, Object> encryptParams) {
+        String userPassword = encryptParams.get("userPassword").toString();
+        String ownerPassword = encryptParams.get("ownerPassword").toString();
+        String fileId = encryptParams.get("fileId").toString();
+
+        File pdfFile = uploadPath.resolve(fileId + ".pdf").toFile();
+
+        PDFUtils.encryptPdf(pdfFile, pdfFile.getPath(), userPassword, ownerPassword);
+        String outputUrl = "/api/file/output/" + fileId + ".pdf";
+        String outputName = fileId + ".pdf";
+        long fileSize = pdfFile.length();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("size", fileSize);
+        data.put("url", outputUrl);
+        data.put("fileName", outputName);
+        data.put("fileId", fileId);
+        data.put("type", "pdf");
+        return Result.success(data);
+    }
+
+    @PostMapping(value = "/decrypt")
+    public Result<Map<String, Object>> decryptPdf(@RequestBody Map<String, Object> encryptParams) {
+        String ownerPassword = encryptParams.get("ownerPassword").toString();
+        String fileId = encryptParams.get("fileId").toString();
+
+        File encryptedFile = uploadPath.resolve(fileId + ".pdf").toFile();
+
+        PDFUtils.decryptPdf(encryptedFile, encryptedFile.getPath(), ownerPassword);
+        String outputUrl = "/api/file/output/" + fileId + ".pdf";
+        String outputName = fileId + ".pdf";
+        long fileSize = encryptedFile.length();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("size", fileSize);
+        data.put("url", outputUrl);
+        data.put("fileName", outputName);
+        data.put("fileId", fileId);
+        data.put("type", "pdf");
+        return Result.success(data);
+    }
 }
